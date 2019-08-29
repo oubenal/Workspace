@@ -1,6 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Classification;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Formatting;
@@ -8,19 +7,41 @@ using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Recommendations;
 using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Simplification;
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace Workspaces
 {
+
+    class TokenFinder
+    {
+        private IEnumerable<(TextSpan Span, Issue Issue)> issues; // use heap on span for bfs 
+        public ImmutableArray<SyntaxToken> IssueTokens { get; }
+
+        internal TokenFinder(SyntaxNode root, ICollection<Issue> foundIssues)
+        {
+            issues = foundIssues.ToImmutableSortedDictionary(_ => _.Offset.ParseOffset(), _ => _).Select(_ => (_.Key, _.Value));
+            IssueTokens = issues.Select(_ => root.FindToken(_.Span.Start)).ToImmutableArray();
+        }
+    }
     class Program
     {
         static void Main(string[] args)
         {
-            var ws = MSBuildWorkspace.Create();
-            var sln = ws.OpenSolutionAsync(@"..\..\..\Workspaces.sln").Result;
+            var report = new ReportWrapper(@"C:\Users\ouben\Downloads\TeamCitySharpReport.xml");
 
+            var ws = MSBuildWorkspace.Create();
+            var sln = ws.OpenSolutionAsync(@"C:\Users\ouben\source\repos\TeamCitySharp\TeamCitySharp.sln").Result;
+
+            foreach (var projectWithIssues in report.ProjectsWithIssues)
+            {
+                Classify(sln, projectWithIssues);
+            }
+            
             // TODO: Uncomment the desired demo
 
             //PrintSolution(sln);
@@ -31,10 +52,6 @@ namespace Workspaces
             //Rename(ws, sln);
             //Simplification(sln);
         }
-
-        //
-        // DEMO 1
-        //
 
         static void PrintSolution(Solution sln)
         {
@@ -77,76 +94,84 @@ namespace Workspaces
             }
         }
 
-        //
-        // DEMO 2
-        //
-
-        static void Classify(Workspace ws, Solution sln)
+        static void Classify(Solution sln, Project project)
         {
-            //
-            // Get the Tests\Bar.cs document.
-            //
-
-            var proj = sln.Projects.Single(p => p.Name == "Tests");
-            var test = proj.Documents.Single(d => d.Name == "Bar.cs");
-
-            var tree = test.GetSyntaxTreeAsync().Result;
-            var root = tree.GetRootAsync().Result;
-
-
-            //
-            // Get all the spans in the document that are classified as language elements.
-            //
-
-            var spans = Classifier.GetClassifiedSpansAsync(test, root.FullSpan).Result.ToDictionary(c => c.TextSpan.Start, c => c);
-
-
-            //
-            // Print the source text with appropriate colorization.
-            //
-
-            var txt = tree.GetText().ToString();
-
-            var i = 0;
-            foreach (var c in txt)
+        
+            var proj = sln.Projects.Single(p => p.Name == project.Name);
+            var issuesByFiles = project.Issues.GroupBy(_ => _.File).ToDictionary(_ => _.Key, _ => _.ToImmutableList());
+            foreach(var fileName in issuesByFiles.Keys)
             {
-                var span = default(ClassifiedSpan);
-                if (spans.TryGetValue(i, out span))
+                var document = proj.Documents.Single(d =>
                 {
-                    var color = ConsoleColor.Gray;
+                    string v1 = Path.Combine(sln.FilePath.Replace(Path.GetFileName(sln.FilePath), ""), fileName);
+                    bool v = d.FilePath == v1;
+                    return v;
+                });
 
-                    switch (span.ClassificationType)
+                var tree = document.GetSyntaxTreeAsync().Result;
+                var x = tree.GetLocation(new TextSpan(211, 218));
+                var root = tree.GetRootAsync().Result;
+
+                var foundIssues = issuesByFiles[fileName];
+                var tokenWithIssues = new TokenFinder(root, foundIssues);
+
+                //
+                // Get all the spans in the document that are classified as language elements.
+                //
+
+                var classifiedSpansAsync = Classifier.GetClassifiedSpansAsync(document, root.FullSpan);
+                var spans = classifiedSpansAsync.Result.GroupBy(c => c.TextSpan.Start)
+                  .ToDictionary(c => c.Key, c => c.First());
+
+
+                //
+                // Print the source text with appropriate colorization.
+                //
+
+                var txt = tree.GetText().ToString();
+
+                var i = 0;
+                foreach (var c in txt)
+                {
+                    var span = default(ClassifiedSpan);
+                    if (spans.TryGetValue(i, out span))
                     {
-                        case ClassificationTypeNames.Keyword:
-                            color = ConsoleColor.Cyan;
-                            break;
-                        case ClassificationTypeNames.StringLiteral:
-                        case ClassificationTypeNames.VerbatimStringLiteral:
-                            color = ConsoleColor.Red;
-                            break;
-                        case ClassificationTypeNames.Comment:
-                            color = ConsoleColor.Green;
-                            break;
-                        case ClassificationTypeNames.ClassName:
-                        case ClassificationTypeNames.InterfaceName:
-                        case ClassificationTypeNames.StructName:
-                        case ClassificationTypeNames.EnumName:
-                        case ClassificationTypeNames.TypeParameterName:
-                        case ClassificationTypeNames.DelegateName:
-                            color = ConsoleColor.Yellow;
-                            break;
-                        case ClassificationTypeNames.Identifier:
-                            color = ConsoleColor.DarkGray;
-                            break;
+                        var color = ConsoleColor.Gray;
+
+                        switch (span.ClassificationType)
+                        {
+                            case ClassificationTypeNames.Keyword:
+                                color = ConsoleColor.Cyan;
+                                break;
+                            case ClassificationTypeNames.StringLiteral:
+                            case ClassificationTypeNames.VerbatimStringLiteral:
+                                color = ConsoleColor.Red;
+                                break;
+                            case ClassificationTypeNames.Comment:
+                                color = ConsoleColor.Green;
+                                break;
+                            case ClassificationTypeNames.ClassName:
+                            case ClassificationTypeNames.InterfaceName:
+                            case ClassificationTypeNames.StructName:
+                            case ClassificationTypeNames.EnumName:
+                            case ClassificationTypeNames.TypeParameterName:
+                            case ClassificationTypeNames.DelegateName:
+                                color = ConsoleColor.Yellow;
+                                break;
+                            case ClassificationTypeNames.Identifier:
+                                color = ConsoleColor.DarkGray;
+                                break;
+                        }
+
+                        Console.ForegroundColor = color;
                     }
 
-                    Console.ForegroundColor = color;
+                    Console.Write(c);
+
+                    i++;
                 }
-
-                Console.Write(c);
-
-                i++;
             }
+            
         }
 
         //
@@ -191,7 +216,7 @@ namespace Workspaces
             //
             // Get the Tests project.
             //
-            var proj = sln.Projects.Single(p => p.Name == "Tests");
+            var proj = sln.Projects.Single(p => p.Name == "TeamCitySharp(net45)");
 
 
             //
@@ -199,20 +224,25 @@ namespace Workspaces
             //
             var comp = proj.GetCompilationAsync().Result;
 
-            var barType = comp.GetTypeByMetadataName("Workspaces.Bar");
+            var barType = comp.GetTypeByMetadataName("TeamCitySharp.ClassWithStaticMethod");
 
-            var fooMethod = barType.GetMembers().Single(m => m.Name == "Foo");
+            var method = barType.GetMembers().Single(m => m.Name == "DoNothing");
             var quxProp = barType.GetMembers().Single(m => m.Name == "Qux");
 
+            //var test = proj.Documents.Single(d => d.Name == "ClassWithStaticMethod.cs");
 
+            //var tree = test.GetSyntaxTreeAsync().Result;
+            //var root = tree.GetRootAsync().Result;
+            //var method = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.ValueText == "DoNothing");
+            
             //
             // Find callers across the solution.
             //
 
-            Console.WriteLine("Find callers of Foo");
+            Console.WriteLine($"Find callers of {method.Name}");
             Console.WriteLine();
 
-            var callers = SymbolFinder.FindCallersAsync(fooMethod, sln).Result;
+            var callers = SymbolFinder.FindCallersAsync(method, sln).Result;
             foreach (var caller in callers)
             {
                 Console.WriteLine(caller.CallingSymbol);
@@ -285,7 +315,7 @@ namespace Workspaces
             //   Console.WriteLine
             //           ^
 
-            var res = Recommender.GetRecommendedSymbolsAtPosition(model, consoleDot.GetLocation().SourceSpan.Start + 1, ws).ToList();
+            var res = Recommender.GetRecommendedSymbolsAtPositionAsync(model, consoleDot.GetLocation().SourceSpan.Start + 1, ws).Result.ToList();
 
             foreach (var rec in res)
             {
