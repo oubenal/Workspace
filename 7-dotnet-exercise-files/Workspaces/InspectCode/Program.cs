@@ -4,7 +4,7 @@
     {
         private static void Main(string[] args)
         {
-            InspectCode.Run(@"C:\Users\ouben\source\repos\TeamCitySharp\TeamCitySharp.sln");
+            InspectCode.Run(@"C:\Path\to\solution\solution.sln");
         }
     }
 }

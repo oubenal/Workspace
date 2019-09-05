@@ -5,7 +5,7 @@ namespace RunProcess
 {
     public class InspectCode
     {
-        private const string REPORT_OUTPUT_FOLDER = @"C:\Users\ouben\AppData\InspectCode";
+        private const string REPORT_OUTPUT_FOLDER = @"C:\Path\to\InspectCode\Reports";
         public static string ReportPath(string slnPath)
         {
             var slnName = System.IO.Path.GetFileNameWithoutExtension(slnPath);
@@ -38,7 +38,7 @@ namespace RunProcess
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = @"C:\Users\ouben\ThirdParties\inspectcode.exe",
+                        FileName = @"C:\Path\to\inspectcode.exe",
                         Arguments = arguments,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
