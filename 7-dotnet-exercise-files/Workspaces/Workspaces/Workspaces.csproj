@@ -60,9 +60,9 @@
     <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Tests\Tests.csproj">
-      <Project>{76003050-e6bb-46e5-b7a8-40655fd251b9}</Project>
-      <Name>Tests</Name>
+    <ProjectReference Include="..\InspectCode\InspectCode.csproj">
+      <Project>{4da2ec9e-0410-4362-b409-64cd01a0333a}</Project>
+      <Name>InspectCode</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

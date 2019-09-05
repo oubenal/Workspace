@@ -1,5 +1,5 @@
-﻿using System.Xml;
 ﻿using System.Diagnostics;
+using System.Xml;
 
 namespace Workspaces
 {
@@ -20,5 +20,7 @@ namespace Workspaces
             Line = int.Parse(node?.Attributes[nameof(Line)]?.Value ?? "0");
             Message = node.Attributes[nameof(Message)].Value;
         }
+
+        public Microsoft.CodeAnalysis.Text.TextSpan Span => Offset.ParseOffset();
     }
 }

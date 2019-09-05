@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Classification;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Formatting;
@@ -14,43 +15,133 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
+using RunProcess;
+
 namespace Workspaces
 {
 
     class TokenFinder
     {
-        private IEnumerable<(TextSpan Span, Issue Issue)> issues; // use heap on span for bfs 
-        public ImmutableArray<SyntaxToken> IssueTokens { get; }
-
-        internal TokenFinder(SyntaxNode root, ICollection<Issue> foundIssues)
+        protected IEnumerable<(TextSpan Span, Issue Issue)> issues; // use heap on span for bfs 
+        
+        internal TokenFinder(SyntaxNode root, IEnumerable<Issue> foundIssues)
         {
-            issues = foundIssues.ToImmutableSortedDictionary(_ => _.Offset.ParseOffset(), _ => _).Select(_ => (_.Key, _.Value));
-            IssueTokens = issues.Select(_ => root.FindToken(_.Span.Start)).ToImmutableArray();
+            // need to handle duplicate
+            // sometimes inspectcode generate duplicate issue line. Should investigate (in unit test projects)
+            var immutableSortedDictionary = foundIssues.ToImmutableSortedDictionary(_ => _.Span, _ => _);
+            issues = immutableSortedDictionary.Select(_ => (_.Key, _.Value));
+        }
+    }
+
+    class UnusedDirectiveTokenFinder : TokenFinder
+    {
+        public ImmutableArray<SyntaxToken> IssueTokens { get; }
+        internal UnusedDirectiveTokenFinder(SyntaxNode root, IEnumerable<Issue> foundIssues)
+            : base(root, foundIssues)
+        {
+            IssueTokens = issues.Where(_ => _.Issue.TypeId == "RedundantUsingDirective")
+                .Select(_ => root.FindToken(_.Span.Start)).ToImmutableArray();
+        }
+    }
+
+    class UnusedDirectiveFixer : CSharpSyntaxRewriter
+    {
+        public override SyntaxNode VisitUsingDirective(UsingDirectiveSyntax node)
+        {
+            return nodes.Contains(node) ? EmptyUsingDirective(node) : base.VisitUsingDirective(node);
+
+        }
+
+        private UsingDirectiveSyntax EmptyUsingDirective(UsingDirectiveSyntax node)
+        {
+            //if (node.HasLeadingTrivia) return null;
+            //return node.WithSemicolonToken(SyntaxFactory.MissingToken(SyntaxKind.SemicolonToken))
+            //    .WithLeadingTrivia(node.GetLeadingTrivia());
+
+            // handle leading trivias
+            return null;
+        }
+
+        private IEnumerable<UsingDirectiveSyntax> nodes;
+        private readonly SyntaxNode _root;
+        internal UnusedDirectiveFixer(SyntaxNode root, ImmutableArray<SyntaxToken> tokens)
+        {
+            _root = root;
+            nodes = tokens.Select(_ => _.Parent.FirstAncestorOrSelf<UsingDirectiveSyntax>())
+                .Where(_ => _ != null);
         }
     }
     class Program
     {
         static void Main(string[] args)
         {
-            var report = new ReportWrapper(@"C:\Users\ouben\Downloads\TeamCitySharpReport.xml");
+            /// open solution
+            var solutionPath = @"C:\Users\ouben\source\repos\TeamCitySharp\TeamCitySharp.sln";
 
-            var ws = MSBuildWorkspace.Create();
-            var sln = ws.OpenSolutionAsync(@"C:\Users\ouben\source\repos\TeamCitySharp\TeamCitySharp.sln").Result;
+            MSBuildWorkspace workspace = MSBuildWorkspace.Create();
+            Solution originalSolution = workspace.OpenSolutionAsync(solutionPath).Result;
+            Solution newSolution = originalSolution;
 
+            //var reportPath = InspectCode.Run(solutionPath);
+            var reportPath = RunProcess.InspectCode.ReportPath(solutionPath);
+            ReportWrapper report = new ReportWrapper(reportPath);
+
+            // explore documents with issues
             foreach (var projectWithIssues in report.ProjectsWithIssues)
             {
-                Classify(sln, projectWithIssues);
-            }
-            
-            // TODO: Uncomment the desired demo
+                var projectName = projectWithIssues.Name;
+                
+                var issuesByFiles = projectWithIssues.Issues.GroupBy(_ => _.File).ToDictionary(_ => _.Key, _ => _.ToImmutableList());
+                foreach (var fileName in issuesByFiles.Keys)
+                {
+                    // Look up the snapshot for the original project in the latest forked solution.
+                    var project = GetSolution(newSolution, projectName);
+                    if (project == null) continue;
 
-            //PrintSolution(sln);
-            //Classify(ws, sln);
-            //Formatting(sln);
-            //SymbolFinding(sln);
-            //Recommend(ws, sln);
-            //Rename(ws, sln);
-            //Simplification(sln);
+                    var filePath = Path.Combine(originalSolution.FilePath.Replace(Path.GetFileName(originalSolution.FilePath), ""), fileName);
+                    // Look up the snapshot for the original document in the latest forked project.
+                    var document = project.Documents.Single(_ => _.FilePath == filePath);
+
+                    // do work
+                    var tree = document.GetSyntaxTreeAsync().Result;
+                    var root = tree.GetRootAsync().Result;
+                    var issuesInFile = issuesByFiles[fileName];
+                    var issuesByType = issuesInFile.ToLookup(_ => _.TypeId, _ => _);
+                    // we only look for this type of issue for now
+                    var issues = issuesByType["RedundantUsingDirective"];
+                    if (!issues.Any()) continue;
+
+                    var tokensWithIssue = new UnusedDirectiveTokenFinder(root, issuesByType["RedundantUsingDirective"]);
+                    if (tokensWithIssue.IssueTokens.IsEmpty) continue;
+                    var fixer = new UnusedDirectiveFixer(root, tokensWithIssue.IssueTokens);
+
+                    // Get a transformed version of the document (a new solution snapshot is created implicitly to contain it)
+                    var newRoot = fixer.Visit(root);
+                    Document newDocument = document.WithSyntaxRoot(newRoot);
+
+                    var text = root.ToFullString();
+                    var newText = newDocument.GetSyntaxTreeAsync().Result.GetRootAsync().Result.ToFullString();
+
+                    // Store the solution implicitly constructed in the previous step as the latest
+                    // one so we can continue building it up in the next iteration.
+                    newSolution = newDocument.Project.Solution;
+                }
+            }
+            // Actually apply the accumulated changes and save them to disk. At this point
+            // workspace.CurrentSolution is updated to point to the new solution.
+            if (workspace.TryApplyChanges(newSolution))
+            {
+                Console.WriteLine("Solution updated.");
+            }
+            else
+            {
+                Console.WriteLine("fix failed!");
+            }
+        }
+
+        private static Microsoft.CodeAnalysis.Project GetSolution(Solution newSolution, string projectName)
+        {
+            return newSolution.Projects.SingleOrDefault(p => p.Name == projectName);
         }
 
         static void PrintSolution(Solution sln)
@@ -101,15 +192,10 @@ namespace Workspaces
             var issuesByFiles = project.Issues.GroupBy(_ => _.File).ToDictionary(_ => _.Key, _ => _.ToImmutableList());
             foreach(var fileName in issuesByFiles.Keys)
             {
-                var document = proj.Documents.Single(d =>
-                {
-                    string v1 = Path.Combine(sln.FilePath.Replace(Path.GetFileName(sln.FilePath), ""), fileName);
-                    bool v = d.FilePath == v1;
-                    return v;
-                });
+                var filePath = Path.Combine(sln.FilePath.Replace(Path.GetFileName(sln.FilePath), ""), fileName);
+                var document = proj.Documents.Single(_ => _.FilePath == filePath);
 
                 var tree = document.GetSyntaxTreeAsync().Result;
-                var x = tree.GetLocation(new TextSpan(211, 218));
                 var root = tree.GetRootAsync().Result;
 
                 var foundIssues = issuesByFiles[fileName];
@@ -174,10 +260,6 @@ namespace Workspaces
             
         }
 
-        //
-        // DEMO 3
-        //
-
         static void Formatting(Solution sln)
         {
             //
@@ -206,10 +288,6 @@ namespace Workspaces
             Console.WriteLine(res.GetSyntaxTreeAsync().Result.GetText());
             Console.WriteLine();
         }
-
-        //
-        // DEMO 4
-        //
 
         static void SymbolFinding(Solution sln)
         {
@@ -274,22 +352,6 @@ namespace Workspaces
             }
         }
 
-        static void SomeCaller()
-        {
-            Bar.Foo();
-            Bar.Foo();
-        }
-
-        static void SomeQuxReader()
-        {
-            Console.WriteLine(Bar.Qux);
-        }
-
-
-        //
-        // DEMO 5
-        //
-
         static void Recommend(Workspace ws, Solution sln)
         {
             //
@@ -322,10 +384,6 @@ namespace Workspaces
                 Console.WriteLine(rec);
             }
         }
-
-        //
-        // DEMO 6
-        //
 
         static void Rename(Workspace ws, Solution sln)
         {
@@ -376,10 +434,6 @@ namespace Workspaces
             var newTxt = newDoc.GetTextAsync().Result;
             Console.WriteLine(newTxt);
         }
-
-        //
-        // DEMO 7
-        //
 
         static void Simplification(Solution sln)
         {
