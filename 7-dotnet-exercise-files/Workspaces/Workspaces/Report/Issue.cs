@@ -1,7 +1,9 @@
 ﻿using System.Xml;
+﻿using System.Diagnostics;
 
 namespace Workspaces
 {
+    [DebuggerDisplay("{TypeId}, {Line}, {Span.ToString()}")]
     class Issue
     {
         internal readonly string TypeId;

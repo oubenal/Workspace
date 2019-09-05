@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Xml;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Workspaces
 {
+    [DebuggerDisplay("{Name}, {Issues.Count}")]
     class Project
     {
         internal readonly string Name;
