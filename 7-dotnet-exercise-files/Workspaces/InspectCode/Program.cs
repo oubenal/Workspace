@@ -15,7 +15,6 @@ namespace RunProcess
                 @"--absolute-paths",
                 @"--swea",
                 @"--severity=Warning",
-                @"--verbosity=INFO",
                 @"--no-buildin-settings",
                 @"--cache-home=%LOCALAPPDATA%\InspectCode\cache\solution_name",
                 @"--properties:Platform=x86;Configuration=Release",
