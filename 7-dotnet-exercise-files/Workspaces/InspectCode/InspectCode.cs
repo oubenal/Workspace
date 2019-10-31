@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Microsoft.Extensions.CommandLineUtils;
 
@@ -8,7 +9,7 @@ namespace RunProcess
     public class InspectCode
     {
         #region private
-        private const string REPORT_OUTPUT_FOLDER = @"C:\Users\ouben\AppData\InspectCode"; // to constructor
+        private readonly DirectoryInfo reportOutputPath; // to constructor
 
         private const string PROFILE = "--profile|-p";
         private const string OUTPUT = "--output|-o";
@@ -23,13 +24,12 @@ namespace RunProcess
 
         private const string HELP_FLAG = "-? |-h |--help";
 
-        private static string ReportPath(string slnPath)
+        private string ReportPath(string slnPath)
         {
             var slnName = System.IO.Path.GetFileNameWithoutExtension(slnPath);
-            return $@"{REPORT_OUTPUT_FOLDER}\{slnName}.report.xml";
+            return $@"{reportOutputPath}\{slnName}.report.xml";
         }
-        #endregion
-        private static string RunInspectCodeExe(string slnPath, string arguments)
+        private string RunInspectCodeExe(string slnPath, string arguments)
         {
             try
             {
@@ -64,7 +64,13 @@ namespace RunProcess
 
             return ReportPath(slnPath);
         }
-        public static int RunInspections(string[] args)
+
+        #endregion
+        public InspectCode(string outputPath = @"C:\Users\ouben\AppData\InspectCode")
+        {
+            reportOutputPath = Directory.CreateDirectory(outputPath);
+        }
+        public int RunInspections(string[] args)
         {
             var app = new CommandLineApplication(true);
 
@@ -101,6 +107,7 @@ namespace RunProcess
 
             return app.Execute(args);
         }
+        public string ReportDir => reportOutputPath.FullName;
     }
     internal static class Utils
     {

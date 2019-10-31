@@ -23,7 +23,8 @@ namespace RunProcess
 #endif
             try
             {
-                return InspectCode.RunInspections(args);
+                var inspectCode = new InspectCode();
+                return inspectCode.RunInspections(args);
             }
             catch (Exception e)
             {
