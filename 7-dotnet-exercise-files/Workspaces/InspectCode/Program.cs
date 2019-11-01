@@ -4,7 +4,7 @@ namespace RunProcess
 {
     internal class Program
     {
-        private static int Main(string[] args)
+        internal static int Main(string[] args)
         {
 #if DEBUG
             var slnPath = @"C:\RandD\Roslyn-Example\7-dotnet-exercise-files\Workspaces\Workspaces.sln";
@@ -14,7 +14,7 @@ namespace RunProcess
                 @"--profile=C:\Users\ouben\AppData\Roaming\JetBrains\Shared\vAny\GlobalSettingsStorage.DotSettings", //Default path for computer settings
                 @"--absolute-paths",
                 @"--swea",
-                @"--severity=Warning",
+                @"--severity=Suggestion",
                 @"--no-buildin-settings",
                 @"--cache-home=%LOCALAPPDATA%\InspectCode\cache\solution_name",
                 @"--properties:Platform=x86;Configuration=Release",

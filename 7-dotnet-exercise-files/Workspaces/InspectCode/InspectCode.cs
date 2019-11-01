@@ -26,7 +26,7 @@ namespace RunProcess
 
         private string ReportPath(string slnPath)
         {
-            var slnName = System.IO.Path.GetFileNameWithoutExtension(slnPath);
+            var slnName = Path.GetFileNameWithoutExtension(slnPath);
             return $@"{reportOutputPath}\{slnName}.report.xml";
         }
         private string RunInspectCodeExe(string slnPath, string arguments)
@@ -93,7 +93,7 @@ namespace RunProcess
 
             app.OnExecute(() =>
             {
-                var argumentConcat = options.Where(opt => opt.HasValue()).Select(opt => opt.GetArgs()).Aggregate((concat, str) => $"{concat} {str}");
+                var argumentConcat = options.Where(co => co.HasValue()).Select(co => co.GetArgs()).Aggregate((arg, @in) => $"{arg} {@in}");
 
                 var slnPath = argument.Value;
                 if (!string.IsNullOrWhiteSpace(slnPath))
