@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace RD.InspectCode.Report
 {
     internal class IssueType
     {
-        string Id;
-        SeverityEnum Severity; 
-        
         IssueType(string id, string severity)
         {
             Id = id;
@@ -38,7 +36,10 @@ namespace RD.InspectCode.Report
                     throw new ArgumentException("Incorrect severity word");
             }
         }
-        
+
+        internal string Id;
+        internal SeverityEnum Severity;
+
         internal static IEnumerable<IssueType> GetIssueTypes(XmlDocument report)
         {
             var IssueTypeList = report.SelectNodes("/Report/IssueTypes/IssueType");
@@ -52,5 +53,9 @@ namespace RD.InspectCode.Report
             }
         }
 
+        internal bool CheckIfGlobal()
+        {
+            return Regex.Match(Id, @".Global$").Success;
+        }
     }
 }

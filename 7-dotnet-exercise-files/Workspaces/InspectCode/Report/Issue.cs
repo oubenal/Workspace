@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace RD.InspectCode.Report
@@ -22,5 +23,10 @@ namespace RD.InspectCode.Report
         }
 
         public Microsoft.CodeAnalysis.Text.TextSpan Span => Offset.ParseOffset();
+
+        internal bool CheckIfGlobal()
+        {
+            return Regex.Match(TypeId, @".Global$").Success;
+        }
     }
 }

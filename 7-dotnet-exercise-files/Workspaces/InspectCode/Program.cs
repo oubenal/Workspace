@@ -32,6 +32,7 @@ namespace RD.InspectCode
                     throw new Exception("InspectCode internal error");
                 InspectCodeReport report = new InspectCodeReport(reportPath);
 
+                var filteredReport = report.FilterGlobal();
                 return 0;
             }
             catch (Exception e)
