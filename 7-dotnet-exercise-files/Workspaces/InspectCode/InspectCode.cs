@@ -11,16 +11,16 @@ namespace RunProcess
         #region private
         private readonly DirectoryInfo reportOutputPath; // to constructor
 
-        private const string PROFILE = "--profile|-p";
-        private const string OUTPUT = "--output|-o";
-        private const string PROJECT = "--project";
-        private const string ABSOLUTE_PATH = "--absolute-paths|-a";
         private const string SWEA = "--swea";
         private const string NO_SWEA = "--no-swea";
+        private const string OUTPUT = "--output|-o";
+        private const string PROFILE = "--profile|-p";
+        private const string PROJECT = "--project";
         private const string SEVERITY = "--severity";
-        private const string NO_BUILDIN_SETTINGS = "--no-buildin-settings";
         private const string CACHE_HOME = "--cache-home";
         private const string PROPERTIES = "--properties";
+        private const string ABSOLUTE_PATH = "--absolute-paths|-a";
+        private const string NO_BUILDIN_SETTINGS = "--no-buildin-settings";
 
         private const string HELP_FLAG = "-? |-h |--help";
 
@@ -29,8 +29,9 @@ namespace RunProcess
             var slnName = Path.GetFileNameWithoutExtension(slnPath);
             return $@"{reportOutputPath}\{slnName}.report.xml";
         }
-        private string RunInspectCodeExe(string slnPath, string arguments)
+        private string RunInspectCodeExe(CommandOption[] options, string slnPath)
         {
+            var arguments = options.Where(co => co.HasValue()).Select(co => ExtractArgument(co)).Aggregate((arg, @in) => $"{arg} {@in}");
             try
             {
                 var process = new Process
@@ -64,7 +65,20 @@ namespace RunProcess
 
             return ReportPath(slnPath);
         }
-
+        private static string ExtractArgument(CommandOption command)
+        {
+            if (!command.HasValue())
+                return "";
+            switch (command.OptionType)
+            {
+                case CommandOptionType.SingleValue:
+                    return $"{command.Template.Split('|')[0]}={command.Value()}";
+                case CommandOptionType.NoValue:
+                    return $"{command.Template.Split('|')[0]} ";
+                default:
+                    throw new InvalidOperationException("Invalid command");
+            }
+        }
         #endregion
         public InspectCode(string outputPath = @"C:\Users\ouben\AppData\InspectCode")
         {
@@ -93,11 +107,9 @@ namespace RunProcess
 
             app.OnExecute(() =>
             {
-                var argumentConcat = options.Where(co => co.HasValue()).Select(co => co.GetArgs()).Aggregate((arg, @in) => $"{arg} {@in}");
-
-                var slnPath = argument.Value;
+                 var slnPath = argument.Value;
                 if (!string.IsNullOrWhiteSpace(slnPath))
-                    RunInspectCodeExe(slnPath, argumentConcat);
+                    RunInspectCodeExe(options, slnPath);
                 else
                     app.ShowHelp();
                 return 0;
@@ -108,23 +120,5 @@ namespace RunProcess
             return app.Execute(args);
         }
         public string ReportDir => reportOutputPath.FullName;
-    }
-    internal static class Utils
-    {
-        private static string OneOpt(this string options) => options.Split('|')[0];
-        public static string GetArgs(this CommandOption command)
-        {
-            if (!command.HasValue())
-                return "";
-            switch(command.OptionType)
-            {
-                case CommandOptionType.SingleValue:
-                    return $"{command.Template.OneOpt()}={command.Value()}";
-                case CommandOptionType.NoValue:
-                    return $"{command.Template.OneOpt()} ";
-                default:
-                    throw new InvalidOperationException("Invalid command");
-            }
-        }
     }
 }
