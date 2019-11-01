@@ -1,4 +1,5 @@
-﻿using System;
+﻿using log4net;
+using System;
 
 namespace RunProcess
 {
@@ -21,6 +22,7 @@ namespace RunProcess
                 $"{slnPath}",
             };
 #endif
+            var log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
             try
             {
                 var inspectCode = new InspectCode();
@@ -28,7 +30,7 @@ namespace RunProcess
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.GetBaseException().Message);
+                log.Error(e.GetBaseException().Message);
                 return 0xbad;
             }
         }

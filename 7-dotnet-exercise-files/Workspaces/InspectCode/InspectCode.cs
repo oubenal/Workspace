@@ -3,12 +3,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.CommandLineUtils;
+using log4net;
 
 namespace RunProcess
 {
     public class InspectCode
     {
         #region private
+        private static readonly ILog log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private readonly DirectoryInfo reportOutputPath; // to constructor
 
         private const string SWEA = "--swea";
@@ -24,46 +26,35 @@ namespace RunProcess
 
         private const string HELP_FLAG = "-? |-h |--help";
 
-        private string ReportPath(string slnPath)
-        {
-            var slnName = Path.GetFileNameWithoutExtension(slnPath);
-            return $@"{reportOutputPath}\{slnName}.report.xml";
-        }
-        private string RunInspectCodeExe(CommandOption[] options, string slnPath)
+        private void RunInspectCodeExe(CommandOption[] options, string slnPath)
         {
             var arguments = options.Where(co => co.HasValue()).Select(co => ExtractArgument(co)).Aggregate((arg, @in) => $"{arg} {@in}");
-            try
+            using (var process = new Process())
             {
-                var process = new Process
+                string errorOutput = null;
+                process.StartInfo = new ProcessStartInfo
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = @"C:\Program Files\Jetbrains\JetBrains.ReSharper.CommandLineTools.2019.2.3\inspectcode.exe",
-                        Arguments = $"{arguments} {slnPath}",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    }
+                    FileName = @"C:\Program Files\Jetbrains\JetBrains.ReSharper.CommandLineTools.2019.2.3\inspectcode.exe",
+                    Arguments = $"{arguments} {slnPath}",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
                 };
-                Console.WriteLine($@"DEBUG - ""{process.StartInfo.FileName}"" {process.StartInfo.Arguments}");
+                process.ErrorDataReceived += new DataReceivedEventHandler((sender, e) => errorOutput += e.Data);
+
                 process.Start();
-
+                process.BeginErrorReadLine();
                 while (!process.StandardOutput.EndOfStream)
-                {
-                    var line = process.StandardOutput.ReadLine();
-                    Console.WriteLine(line);
-                }
-
+                    log.Debug(process.StandardOutput.ReadLine());
                 process.WaitForExit();
-                if (process.ExitCode != 0)
-                    throw new Exception($"InspectCode exited with code {process.ExitCode}");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.GetBaseException().Message);
-            }
 
-            return ReportPath(slnPath);
+                if (process.ExitCode != 0)
+                {
+                    log.Error(errorOutput);
+                    log.Fatal($"InspectCode exited with code {process.ExitCode}");
+                    }
+            }
         }
         private static string ExtractArgument(CommandOption command)
         {
@@ -107,7 +98,7 @@ namespace RunProcess
 
             app.OnExecute(() =>
             {
-                 var slnPath = argument.Value;
+                var slnPath = argument.Value;
                 if (!string.IsNullOrWhiteSpace(slnPath))
                     RunInspectCodeExe(options, slnPath);
                 else
@@ -119,6 +110,15 @@ namespace RunProcess
 
             return app.Execute(args);
         }
-        public string ReportDir => reportOutputPath.FullName;
     }
+
+    //public interface ILogAware { }
+    //public static class LogAwareExtensions
+    //{
+    //    public static void LogDebug(this ILogAware logAware, string format, params object[] args)
+    //    {
+    //        var logger = LogManager.GetLogger(logAware.GetType());
+    //        logger.Debug(format, args);
+    //    }
+    //}
 }
