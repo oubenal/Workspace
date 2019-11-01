@@ -14,7 +14,6 @@ namespace RD.InspectCode.Report
                   )
         {
         }
-
         private SeverityEnum SeverityFromString(string severity)
         {
             switch(severity)
@@ -52,19 +51,16 @@ namespace RD.InspectCode.Report
             Id = id;
             Severity = SeverityFromString(severity);
         }
-
         internal bool CheckIfGlobal()
         {
             return Regex.Match(Id, @".Global$").Success;
         }
-
         public override bool Equals(object obj)
         {
             return obj is IssueType type &&
                    Id == type.Id &&
                    Severity == type.Severity;
         }
-
         public override int GetHashCode()
         {
             var hashCode = -298609710;

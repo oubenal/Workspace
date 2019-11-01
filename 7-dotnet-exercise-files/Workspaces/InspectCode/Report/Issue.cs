@@ -5,7 +5,7 @@ using System.Xml;
 namespace RD.InspectCode.Report
 {
     [DebuggerDisplay("{TypeId}, {Line}, {Span.ToString()}")]
-    class Issue
+    internal class Issue
     {
         internal readonly string TypeId;
         internal readonly string File;
@@ -13,7 +13,7 @@ namespace RD.InspectCode.Report
         internal readonly int Line;
         internal readonly string Message;
 
-        internal Issue(XmlNode node)
+        private Issue(XmlNode node)
         {
             TypeId = node?.Attributes[nameof(TypeId)]?.Value;
             File = node?.Attributes[nameof(File)]?.Value;
@@ -21,9 +21,11 @@ namespace RD.InspectCode.Report
             Line = int.Parse(node?.Attributes[nameof(Line)]?.Value ?? "0");
             Message = node.Attributes[nameof(Message)].Value;
         }
-
-        public Microsoft.CodeAnalysis.Text.TextSpan Span => Offset.ParseOffset();
-
+        internal static Issue ParseNode(XmlNode node)
+        {
+            return new Issue(node);
+        }
+        internal Microsoft.CodeAnalysis.Text.TextSpan Span => Offset.ParseOffset();
         internal bool CheckIfGlobal()
         {
             return Regex.Match(TypeId, @".Global$").Success;

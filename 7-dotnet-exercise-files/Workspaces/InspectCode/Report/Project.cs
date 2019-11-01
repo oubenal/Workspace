@@ -7,7 +7,7 @@ using System.Diagnostics;
 namespace RD.InspectCode.Report
 {
     [DebuggerDisplay("{Name}, {Issues.Count}")]
-    class Project
+    internal class Project
     {
         private Project(string name, ImmutableList<Issue> issues)
         {
@@ -18,13 +18,20 @@ namespace RD.InspectCode.Report
         internal readonly string Name;
         internal readonly ImmutableList<Issue> Issues;
 
-        Project(XmlNode node)
+        private Project(XmlNode node)
         {
             Name = node.Attributes[nameof(Name)].Value;
             XmlNodeList nodeList = node.ChildNodes;
             Issues = GetIssues(nodeList).ToImmutableList();
         }
-
+        private IEnumerable<Issue> GetIssues(XmlNodeList nodeList)
+        {
+            var it = nodeList.GetEnumerator();
+            while (it.MoveNext())
+            {
+                yield return Issue.ParseNode((XmlNode)it.Current);
+            }
+        }
         internal Project FilterGlobal()
         {
             var leftIssues = Issues.Where(i => !i.CheckIfGlobal()).ToImmutableList();
@@ -32,16 +39,6 @@ namespace RD.InspectCode.Report
                 return null;
             return new Project(Name, leftIssues);
         }
-
-        IEnumerable<Issue> GetIssues(XmlNodeList nodeList)
-        {
-            var it = nodeList.GetEnumerator();
-            while(it.MoveNext())
-            {
-                yield return new Issue((XmlNode)it.Current);
-            }
-        } 
-
         internal static IEnumerable<Project> GetIssues(XmlDocument report)
         {
             var IssueTypeList = report.SelectNodes("/Report/Issues/Project");

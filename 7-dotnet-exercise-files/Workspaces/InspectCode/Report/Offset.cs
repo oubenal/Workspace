@@ -6,14 +6,8 @@ namespace RD.InspectCode.Report
 {
     internal class Offset
     {
-        internal int Start { get; }
-        internal int End { get; }
-
-        private Offset(int start, int end)
-        {
-            Start = start;
-            End = end;
-        }
+        internal readonly int Start;
+        internal readonly int End;
 
         internal Offset(string token)
         {
@@ -22,7 +16,7 @@ namespace RD.InspectCode.Report
             End = positions.Last();
         }
 
-        int Length => End - Start;
+        internal int Length => End - Start;
 
         public override bool Equals(object obj)
         {
@@ -36,7 +30,7 @@ namespace RD.InspectCode.Report
         }
     }
 
-    public static class Utilities
+    internal static class Utilities
     {
         internal static int ShiftAndWrap(this int value, int positions)
         {
@@ -51,7 +45,7 @@ namespace RD.InspectCode.Report
         }
         internal static TextSpan ParseOffset(this Offset offset)
         {
-            return new TextSpan(offset.Start, offset.End - offset.Start);
+            return new TextSpan(offset.Start, offset.Length);
         }
     }
 }

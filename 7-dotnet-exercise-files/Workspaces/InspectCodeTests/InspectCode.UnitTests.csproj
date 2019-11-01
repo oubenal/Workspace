@@ -50,6 +50,8 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Report\IssueTypeTests.cs" />
+    <Compile Include="Report\IssueTests.cs" />
+    <Compile Include="Report\ProjectTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MSTest.TestAdapter">

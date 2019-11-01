@@ -19,11 +19,6 @@ namespace RD.InspectCode.Report.UnitTests
     <IssueType Id=""someIssueId"" Category=""SomeCategory"" CategoryId=""SomeCategoryId"" Severity=""WARNING""/>
     <IssueType Id=""anotherIssueId"" Category=""AnotherCategory"" CategoryId=""AnotherCategoryId"" Severity=""HINT""/>
   </IssueTypes>
-  <Issues>
-    <Project Name=""Application"">
-      <Issue TypeId=""someIssueId"" File=""path\to\file\with\issue.cs"" Offset=""154-164"" Line=""8"" Message=""Namespace does not correspond to file location, should be: 'InspectCode'"" />
-    </Project>
-  </Issues>
 </Report>");
             var expected = new[]
             {
@@ -37,14 +32,13 @@ namespace RD.InspectCode.Report.UnitTests
         [TestMethod()]
         public void CheckIfGlobalTest()
         {
-            var localIssue1 = new IssueType("RedundantUsingDirective", "HINT");
-            var localIssue2 = new IssueType("UnusedMember.Local", "Warning");
-            var globalIssue = new IssueType("ClassNeverInstantiated.Global", "SUGGESTION");
+            var localIssueType1 = new IssueType("RedundantUsingDirective", "HINT");
+            var localIssueType2 = new IssueType("UnusedMember.Local", "WARNING");
+            var globalIssueType = new IssueType("ClassNeverInstantiated.Global", "SUGGESTION");
 
-            Assert.IsFalse(localIssue1.CheckIfGlobal());
-            Assert.IsFalse(localIssue2.CheckIfGlobal());
-            Assert.IsTrue(globalIssue.CheckIfGlobal());
-            Assert.Fail();
+            Assert.IsFalse(localIssueType1.CheckIfGlobal());
+            Assert.IsFalse(localIssueType2.CheckIfGlobal());
+            Assert.IsTrue(globalIssueType.CheckIfGlobal());
         }
     }
 }
