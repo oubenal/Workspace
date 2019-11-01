@@ -5,9 +5,9 @@ using System.Linq;
 using Microsoft.Extensions.CommandLineUtils;
 using log4net;
 
-namespace RunProcess
+namespace RD.InspectCode
 {
-    public class InspectCode
+    public class InspectCodeRunner
     {
         #region private
         private static readonly ILog log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
@@ -26,7 +26,7 @@ namespace RunProcess
 
         private const string HELP_FLAG = "-? |-h |--help";
 
-        private void RunInspectCodeExe(CommandOption[] options, string slnPath)
+        private int RunInspectCodeExe(CommandOption[] options, string slnPath)
         {
             var arguments = options.Where(co => co.HasValue()).Select(co => ExtractArgument(co)).Aggregate((arg, @in) => $"{arg} {@in}");
             using (var process = new Process())
@@ -53,7 +53,8 @@ namespace RunProcess
                 {
                     log.Error(errorOutput);
                     log.Fatal($"InspectCode exited with code {process.ExitCode}");
-                    }
+                }
+                return process.ExitCode;
             }
         }
         private static string ExtractArgument(CommandOption command)
@@ -71,7 +72,7 @@ namespace RunProcess
             }
         }
         #endregion
-        public InspectCode(string outputPath = @"C:\Users\ouben\AppData\InspectCode")
+        public InspectCodeRunner(string outputPath = @"C:\Users\ouben\AppData\InspectCode")
         {
             reportOutputPath = Directory.CreateDirectory(outputPath);
         }
@@ -100,7 +101,7 @@ namespace RunProcess
             {
                 var slnPath = argument.Value;
                 if (!string.IsNullOrWhiteSpace(slnPath))
-                    RunInspectCodeExe(options, slnPath);
+                    return RunInspectCodeExe(options, slnPath);
                 else
                     app.ShowHelp();
                 return 0;

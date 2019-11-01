@@ -1,7 +1,8 @@
 ﻿using log4net;
 using System;
+using RD.InspectCode.Report;
 
-namespace RunProcess
+namespace RD.InspectCode
 {
     internal class Program
     {
@@ -9,9 +10,10 @@ namespace RunProcess
         {
 #if DEBUG
             var slnPath = @"C:\RandD\Roslyn-Example\7-dotnet-exercise-files\Workspaces\Workspaces.sln";
+            var reportPath = ReportPath(slnPath);
             args = new[] {
                 @"--project=*",
-                $@"--output={ReportPath(slnPath)}",
+                $@"--output=reportPath",
                 @"--profile=C:\Users\ouben\AppData\Roaming\JetBrains\Shared\vAny\GlobalSettingsStorage.DotSettings", //Default path for computer settings
                 @"--absolute-paths",
                 @"--swea",
@@ -25,8 +27,12 @@ namespace RunProcess
             var log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
             try
             {
-                var inspectCode = new InspectCode();
-                return inspectCode.RunInspections(args);
+                var inspectCode = new InspectCodeRunner();
+                if (inspectCode.RunInspections(args) != 0)
+                    throw new Exception("InspectCode internal error");
+                InspectCodeReport report = new InspectCodeReport(reportPath);
+
+                return 0;
             }
             catch (Exception e)
             {

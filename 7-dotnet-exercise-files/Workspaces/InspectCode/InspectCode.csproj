@@ -46,6 +46,12 @@
     <Compile Include="InspectCode.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Report\Issue.cs" />
+    <Compile Include="Report\IssueType.cs" />
+    <Compile Include="Report\Offset.cs" />
+    <Compile Include="Report\Project.cs" />
+    <Compile Include="Report\ReportWrapper.cs" />
+    <Compile Include="Report\SeverityEnum.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -54,9 +60,13 @@
     <PackageReference Include="log4net">
       <Version>2.0.8</Version>
     </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp">
+      <Version>3.3.1</Version>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils">
       <Version>1.1.1</Version>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
